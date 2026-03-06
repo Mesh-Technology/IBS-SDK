@@ -7,50 +7,70 @@ import (
 	"net/url"
 )
 
-type pricesResponse struct {
-	Status bool `json:"status"`
-	Data   struct {
-		Total  int     `json:"total"`
-		Prices []Price `json:"prices"`
-	} `json:"data"`
+type CardPriceListQuery struct {
+	BankID   string `form:"bank_id"`
+	CardType string `form:"card_type"`
+	Currency string `form:"currency"`
 }
 
-// Price represents pricing information for a card from a specific bank.
-type Price struct {
-	BankID   string `json:"bank_id"`
-	BankName string `json:"bank_name"`
-	CardType string `json:"card_type"`
-
-	Currency string  `json:"currency"`
-	Price    float64 `json:"price"`
-
-	CashBack         float64 `json:"cash_back"`
-	CashBackCurrency string  `json:"cash_back_currency"`
-
+type cardPriceResponse struct {
+	BankID            string  `json:"bank_id"`
+	BankName          string  `json:"bank_name"`
+	CardType          string  `json:"card_type"`
+	Currency          string  `json:"currency"`
+	Price             float64 `json:"price"`
+	CashBack          float64 `json:"cash_back"`
+	CashBackCurrency  string  `json:"cash_back_currency"`
 	CommissionPercent float64 `json:"commission_percent"`
-
-	CurrencyPrice float64 `json:"currency_price"`
-
-	MinTopup         float64 `json:"min_topup"`
-	MinTopupCurrency string  `json:"min_topup_currency"`
+	CurrencyPrice     float64 `json:"currency_price"`
+	MinTopup          float64 `json:"min_topup"`
+	MinTopupCurrency  string  `json:"min_topup_currency"`
 }
 
-// Prices retrieves pricing information for a given bank and card type.
-func (c *Client) Prices(bankID, cardType string) (*Price, error) {
+type availableBankResponse struct {
+	Code     string `json:"code"`
+	Name     string `json:"name"`
+	LogoURL  string `json:"logo_url"`
+	Region   string `json:"region"`
+	Currency string `json:"currency"`
+}
+
+// CardPriceList holds the combined result of prices and available banks.
+type CardPriceList struct {
+	Total  int                     `json:"total"`
+	Prices []cardPriceResponse     `json:"prices"`
+	Banks  []availableBankResponse `json:"banks"`
+}
+
+type cardPriceListResponse struct {
+	Status bool          `json:"status"`
+	Data   CardPriceList `json:"data"`
+}
+
+// Prices retrieves card pricing information and available banks filtered by the provided query parameters.
+func (c *Client) Prices(q CardPriceListQuery) (*CardPriceList, error) {
 	query := url.Values{}
-	query.Set("bank_id", bankID)
-	query.Set("card_type", cardType)
+	if q.BankID != "" {
+		query.Set("bank_id", q.BankID)
+	}
+	if q.CardType != "" {
+		query.Set("card_type", q.CardType)
+	}
+	if q.Currency != "" {
+		query.Set("currency", q.Currency)
+	}
 
 	respBody, err := c.requestAPI(
 		http.MethodGet,
 		"/card/prices?"+query.Encode(),
 		nil,
-		true)
+		true,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	var responseMap pricesResponse
+	var responseMap cardPriceListResponse
 	if err := json.Unmarshal(respBody, &responseMap); err != nil {
 		return nil, err
 	}
@@ -59,5 +79,5 @@ func (c *Client) Prices(bankID, cardType string) (*Price, error) {
 		return nil, errors.New("ibs: no prices found")
 	}
 
-	return &responseMap.Data.Prices[0], nil
+	return &responseMap.Data, nil
 }
