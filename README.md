@@ -5,7 +5,7 @@ A Go module providing a client SDK for the **IBS** (card provider) service. This
 ## Installation
 
 ```sh
-go get github.com/innovatex/ibs-sdk
+go get github.com/Mesh-Technology/IBS-SDK
 ```
 
 ## Project Structure
@@ -39,7 +39,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/innovatex/ibs-sdk/ibs"
+	"github.com/Mesh-Technology/IBS-SDK/ibs"
 )
 
 func main() {
@@ -346,7 +346,7 @@ import "papara/cms"
 c := cms.New(userID, cardID)
 
 // ─── After ────────────────────────────────────
-import "github.com/innovatex/ibs-sdk/ibs"
+import "github.com/Mesh-Technology/IBS-SDK/ibs"
 
 // once at startup:
 ibs.Configure(ibs.Config{
