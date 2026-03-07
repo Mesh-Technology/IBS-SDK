@@ -9,6 +9,7 @@ import (
 // Virtual holds the parameters for creating a virtual card.
 type Virtual struct {
 	BankID       string
+	CardType     string
 	PhoneNumber  string
 	UserEmail    string
 	UserFullName string
@@ -52,6 +53,7 @@ func (c *Client) VirtualCard(data Virtual) (*Card, *PendingCardOrder, error) {
 			"user_full_name": data.UserFullName,
 			"user_email":     data.UserEmail,
 			"bank_id":        data.BankID,
+			"card_type":      data.CardType,
 			"phone_number":   data.PhoneNumber,
 			"description":    data.Description,
 		},
