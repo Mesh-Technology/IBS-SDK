@@ -7,7 +7,7 @@ import (
 	"net/url"
 )
 
-type cardPriceListQuery struct {
+type CardPriceListQuery struct {
 	BankID   string `form:"bank_id"`
 	CardType string `form:"card_type"`
 	Currency string `form:"currency"`
@@ -66,7 +66,7 @@ type cardPriceListResponse struct {
 
 // Prices retrieves card pricing information, available banks, and the pool
 // recommendation filtered by the provided query parameters.
-func (c *Client) Prices(q cardPriceListQuery) (*CardPriceList, error) {
+func (c *Client) Prices(q CardPriceListQuery) (*CardPriceList, error) {
 	query := url.Values{}
 	if q.BankID != "" {
 		query.Set("bank_id", q.BankID)
