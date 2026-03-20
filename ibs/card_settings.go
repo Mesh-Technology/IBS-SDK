@@ -75,3 +75,18 @@ func (c *Client) UpdateOwnership(newUserID string) error {
 
 	return err
 }
+
+// ChangePhone changes the phone number associated with the card.
+func (c *Client) ChangePhone(newPhone string) error {
+	_, err := c.requestAPI(
+		http.MethodPost,
+		"/card/setting/phone",
+		map[string]any{
+			"card_id":   c.cardID,
+			"user_id":   c.userID,
+			"new_phone": newPhone,
+		},
+		true)
+
+	return err
+}
