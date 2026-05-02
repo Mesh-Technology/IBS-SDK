@@ -1,6 +1,6 @@
 # IBS SDK for Go
 
-A Go module providing a client SDK for the **IBS** (card provider) service. This package handles authentication (hex-encoded HMAC-SHA512 signing with per-request nonces), request construction, response parsing, and callback verification for all IBS API endpoints.
+A Go module providing a client SDK for the **IBS** (card provider) service. This package handles authentication (hex-encoded HMAC-SHA256 signing with per-request nonces), request construction, response parsing, and callback verification for all IBS API endpoints.
 
 ## Installation
 
@@ -80,9 +80,9 @@ ibs.Configure(ibs.Config{
 |-------------|---------------------------------------------------|
 | `APIURL`    | Base URL of the IBS API                           |
 | `APIKey`    | API key for authentication and HMAC signing       |
-| `SecretKey` | Base64-encoded secret key for HMAC-SHA512 signing |
+| `SecretKey` | Base64-encoded secret key for HMAC-SHA256 signing |
 
-Authenticated requests include `X-Api-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`. The signature is `hex(HMAC-SHA512(body || apiKey || timestamp || nonce, base64_decode(secretKey)))`.
+Authenticated requests include `X-Api-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`. The signature is `hex(HMAC-SHA256(body || 0x1F || apiKey || 0x1F || timestamp || 0x1F || nonce, base64_decode(secretKey)))` — fields are joined by 0x1F (ASCII unit separator) so the boundary between them is unambiguous. Monetary endpoints (`/card/balance/add`, `/card/balance/dec`) additionally require an `X-Idempotency-Key` header (the SDK generates one automatically; use `CardBalanceIdempotent` to control it).
 
 **Never hardcode secrets** — use environment variables or a secret manager.
 

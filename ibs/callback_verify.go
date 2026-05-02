@@ -3,7 +3,7 @@ package ibs
 import (
 	"bytes"
 	"crypto/hmac"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -66,7 +66,7 @@ type PendingCardReverseCallback struct {
 	Reason        string `json:"reason"`
 }
 
-// VerifyCallbackSignature verifies the HMAC-SHA512 signature of a callback payload
+// VerifyCallbackSignature verifies the HMAC-SHA256 signature of a callback payload
 // using the provided API key, signature, timestamp, nonce, and raw body bytes.
 func (c *Client) VerifyCallbackSignature(apiKey, signature, timestamp, nonce string, body []byte) error {
 	receivedAPIKey := strings.TrimSpace(apiKey)
@@ -116,13 +116,16 @@ func signCallbackBody(body []byte, apiKey, secretKey, timestamp, nonce string) (
 		return "", fmt.Errorf("ibs: failed to decode secret key: %w", err)
 	}
 
-	message := make([]byte, 0, len(body)+len(apiKey)+len(timestamp)+len(nonce))
+	message := make([]byte, 0, len(body)+len(apiKey)+len(timestamp)+len(nonce)+3)
 	message = append(message, body...)
-	message = append(message, []byte(apiKey)...)
-	message = append(message, []byte(timestamp)...)
-	message = append(message, []byte(nonce)...)
+	message = append(message, hmacFieldSeparator)
+	message = append(message, apiKey...)
+	message = append(message, hmacFieldSeparator)
+	message = append(message, timestamp...)
+	message = append(message, hmacFieldSeparator)
+	message = append(message, nonce...)
 
-	mac := hmac.New(sha512.New, decodedSecretKey)
+	mac := hmac.New(sha256.New, decodedSecretKey)
 	mac.Write(message)
 
 	return hex.EncodeToString(mac.Sum(nil)), nil

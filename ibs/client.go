@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha512"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -18,6 +18,12 @@ import (
 	"sync/atomic"
 	"time"
 )
+
+// hmacFieldSeparator is inserted between body, apiKey, timestamp, and nonce
+// when building the HMAC payload. Using 0x1F (ASCII unit separator) makes the
+// boundary between fields unambiguous so two distinct tuples can never produce
+// the same payload by shifting bytes across boundaries.
+const hmacFieldSeparator = 0x1F
 
 // Config holds the required configuration for connecting to the IBS API.
 type Config struct {
@@ -165,20 +171,25 @@ func newNonce() (string, error) {
 	return hex.EncodeToString(nonce), nil
 }
 
-// sign produces the HMAC-SHA512 signature used by the IBS API.
+// sign produces the HMAC-SHA256 signature used by the IBS API. Fields are
+// joined by hmacFieldSeparator so the boundary between body, apiKey,
+// timestamp, and nonce is unambiguous.
 func (c *Client) sign(body []byte, timestamp, nonce string) (string, error) {
 	ds, err := base64.StdEncoding.DecodeString(c.g.secretKey)
 	if err != nil {
 		return "", fmt.Errorf("ibs: failed to decode secret key: %w", err)
 	}
 
-	message := make([]byte, 0, len(body)+len(c.g.apiKey)+len(timestamp)+len(nonce))
+	message := make([]byte, 0, len(body)+len(c.g.apiKey)+len(timestamp)+len(nonce)+3)
 	message = append(message, body...)
-	message = append(message, []byte(c.g.apiKey)...)
-	message = append(message, []byte(timestamp)...)
-	message = append(message, []byte(nonce)...)
+	message = append(message, hmacFieldSeparator)
+	message = append(message, c.g.apiKey...)
+	message = append(message, hmacFieldSeparator)
+	message = append(message, timestamp...)
+	message = append(message, hmacFieldSeparator)
+	message = append(message, nonce...)
 
-	h := hmac.New(sha512.New, ds)
+	h := hmac.New(sha256.New, ds)
 	h.Write(message)
 
 	return hex.EncodeToString(h.Sum(nil)), nil
@@ -204,16 +215,99 @@ func IsAPIError(err error) (statusCode int, message string, ok bool) {
 	return 0, "", false
 }
 
+// Sentinel errors for API responses that callers commonly want to branch on.
+// Use errors.Is to test against these — they are exposed as wrappable values
+// rather than exported APIError instances so the StatusCode/Body fields of
+// the underlying APIError remain available via errors.As.
+var (
+	// ErrDuplicateIdempotencyKey is returned when the server rejects a
+	// monetary request because the X-Idempotency-Key has already been
+	// processed. The original operation is NOT re-executed; if you need
+	// the prior result, fetch it by transaction ID from your own records.
+	// This corresponds to HTTP 409 from /card/balance/add and /card/balance/dec.
+	ErrDuplicateIdempotencyKey = errors.New("ibs: duplicate idempotency key")
+
+	// ErrPayloadTooLarge is returned when the request body exceeds the
+	// server's body-size limit (currently 1 MiB at the time of writing).
+	// HTTP 413. This shouldn't happen in normal SDK usage; if it does,
+	// inspect what you're sending in the request body.
+	ErrPayloadTooLarge = errors.New("ibs: request payload too large")
+
+	// ErrRateLimited is returned when the server throttles the request
+	// (HTTP 429). The Retry-After header, if present, is surfaced via the
+	// underlying APIError.Body. The /v1/card/* endpoints are not currently
+	// rate-limited, so this is mostly future-proofing.
+	ErrRateLimited = errors.New("ibs: rate limited")
+)
+
+// IsDuplicateIdempotencyKey reports whether err indicates the server saw
+// the same X-Idempotency-Key for a prior request. Convenience wrapper around
+// errors.Is(err, ErrDuplicateIdempotencyKey) for callers that prefer it.
+func IsDuplicateIdempotencyKey(err error) bool {
+	return errors.Is(err, ErrDuplicateIdempotencyKey)
+}
+
+// classifyStatus maps an HTTP status to a sentinel error if one applies, or
+// nil otherwise. Keep in sync with the server's well-known response codes
+// in ibs/middleware/{idempotency,bodylimit,ratelimit}.
+func classifyStatus(status int) error {
+	switch status {
+	case http.StatusConflict:
+		return ErrDuplicateIdempotencyKey
+	case http.StatusRequestEntityTooLarge:
+		return ErrPayloadTooLarge
+	case http.StatusTooManyRequests:
+		return ErrRateLimited
+	}
+	return nil
+}
+
+// statusReason extracts a short human reason from the response body for use
+// in wrapped sentinel errors. Falls back to "HTTP <code>" if the body isn't
+// the expected envelope.
+func statusReason(body []byte, status int) string {
+	var env apiStatusEnvelope
+	if json.Valid(body) {
+		if err := json.Unmarshal(body, &env); err == nil && env.Error != "" {
+			return env.Error
+		}
+	}
+	return fmt.Sprintf("HTTP %d", status)
+}
+
 // apiStatusEnvelope is used to check the top-level status/error fields in every response.
 type apiStatusEnvelope struct {
 	Status bool   `json:"status"`
 	Error  string `json:"error,omitempty"`
 }
 
+// IdempotencyKeyHeader is the header used by the IBS API to deduplicate
+// monetary requests. Sending the same key twice within the server-side
+// retention window returns 409 Conflict rather than re-executing the
+// operation. Required on /balance/add and /balance/dec.
+const IdempotencyKeyHeader = "X-Idempotency-Key"
+
+// newIdempotencyKey returns a 32-hex-char random token. Callers that need
+// retry-safety should reuse the same key across retries of the *same*
+// logical operation.
+func newIdempotencyKey() (string, error) {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("ibs: generate idempotency key: %w", err)
+	}
+	return hex.EncodeToString(buf), nil
+}
+
 // requestAPI performs an authenticated (or unauthenticated) request to the IBS API
 // and returns the raw response body bytes. It checks the top-level "status" field
 // and returns an [APIError] when it is false.
 func (c *Client) requestAPI(method, endpoint string, body map[string]any, auth bool) ([]byte, error) {
+	return c.requestAPIWithIdempotency(method, endpoint, body, auth, "")
+}
+
+// requestAPIWithIdempotency is the same as requestAPI but also sets
+// X-Idempotency-Key when idempotencyKey is non-empty.
+func (c *Client) requestAPIWithIdempotency(method, endpoint string, body map[string]any, auth bool, idempotencyKey string) ([]byte, error) {
 	reqURL := c.g.apiURL + endpoint
 
 	var bodyJSON []byte
@@ -236,6 +330,10 @@ func (c *Client) requestAPI(method, endpoint string, body map[string]any, auth b
 	req.Header.Set("User-Agent", c.g.userAgent)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+
+	if idempotencyKey != "" {
+		req.Header.Set(IdempotencyKeyHeader, idempotencyKey)
+	}
 
 	if auth {
 		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
@@ -262,6 +360,14 @@ func (c *Client) requestAPI(method, endpoint string, body map[string]any, auth b
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("ibs: read response body: %w", err)
+	}
+
+	// Map HTTP status codes that carry SDK-actionable semantics to typed
+	// sentinels BEFORE checking the JSON envelope. The server emits these
+	// as JSON envelopes with status=false, but callers usually want to
+	// branch on the kind of failure rather than parse messages.
+	if sentinel := classifyStatus(resp.StatusCode); sentinel != nil {
+		return nil, fmt.Errorf("%w: %s", sentinel, statusReason(respBody, resp.StatusCode))
 	}
 
 	// Check for non-JSON responses (e.g. HTML error pages from proxies).
