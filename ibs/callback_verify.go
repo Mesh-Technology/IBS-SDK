@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha512"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 )
 
 const callbackMaxTimestampSkewSeconds = 60
+const callbackMaxNonceLength = 128
 
 var (
 	ErrMissingCallbackHeaders   = errors.New("ibs: missing callback hmac headers")
@@ -65,13 +67,14 @@ type PendingCardReverseCallback struct {
 }
 
 // VerifyCallbackSignature verifies the HMAC-SHA512 signature of a callback payload
-// using the provided API key, signature, timestamp, and raw body bytes.
-func (c *Client) VerifyCallbackSignature(apiKey, signature, timestamp string, body []byte) error {
+// using the provided API key, signature, timestamp, nonce, and raw body bytes.
+func (c *Client) VerifyCallbackSignature(apiKey, signature, timestamp, nonce string, body []byte) error {
 	receivedAPIKey := strings.TrimSpace(apiKey)
 	receivedSignature := strings.TrimSpace(signature)
 	receivedTimestamp := strings.TrimSpace(timestamp)
+	receivedNonce := strings.TrimSpace(nonce)
 
-	if receivedAPIKey == "" || receivedSignature == "" || receivedTimestamp == "" {
+	if receivedAPIKey == "" || receivedSignature == "" || receivedTimestamp == "" || receivedNonce == "" || len(receivedNonce) > callbackMaxNonceLength {
 		return ErrMissingCallbackHeaders
 	}
 
@@ -96,7 +99,7 @@ func (c *Client) VerifyCallbackSignature(apiKey, signature, timestamp string, bo
 
 	bodyForSign := make([]byte, len(body))
 	copy(bodyForSign, body)
-	expectedSignature, err := signCallbackBody(bodyForSign, expectedAPIKey, expectedSecretKey, receivedTimestamp)
+	expectedSignature, err := signCallbackBody(bodyForSign, expectedAPIKey, expectedSecretKey, receivedTimestamp, receivedNonce)
 	if err != nil {
 		return err
 	}
@@ -107,21 +110,22 @@ func (c *Client) VerifyCallbackSignature(apiKey, signature, timestamp string, bo
 	return nil
 }
 
-func signCallbackBody(body []byte, apiKey, secretKey, timestamp string) (string, error) {
+func signCallbackBody(body []byte, apiKey, secretKey, timestamp, nonce string) (string, error) {
 	decodedSecretKey, err := base64.StdEncoding.DecodeString(secretKey)
 	if err != nil {
 		return "", fmt.Errorf("ibs: failed to decode secret key: %w", err)
 	}
 
-	message := make([]byte, 0, len(body)+len(apiKey)+len(timestamp))
+	message := make([]byte, 0, len(body)+len(apiKey)+len(timestamp)+len(nonce))
 	message = append(message, body...)
 	message = append(message, []byte(apiKey)...)
 	message = append(message, []byte(timestamp)...)
+	message = append(message, []byte(nonce)...)
 
 	mac := hmac.New(sha512.New, decodedSecretKey)
 	mac.Write(message)
 
-	return base64.StdEncoding.EncodeToString(mac.Sum(nil)), nil
+	return hex.EncodeToString(mac.Sum(nil)), nil
 }
 
 // VerifyCallbackRequest verifies HMAC headers from an http.Request, reads the body,
@@ -142,6 +146,7 @@ func (c *Client) VerifyCallbackRequest(r *http.Request) ([]byte, error) {
 		r.Header.Get("X-Api-Key"),
 		r.Header.Get("X-Signature"),
 		r.Header.Get("X-Timestamp"),
+		r.Header.Get("X-Nonce"),
 		bodyBytes,
 	); err != nil {
 		return nil, err

@@ -1,7 +1,7 @@
 // Package ibs provides a Go SDK client for the IBS card provider service.
 //
-// The SDK handles authentication (HMAC-SHA512 signing), request construction,
-// and response parsing for all IBS API endpoints including card creation,
+// The SDK handles authentication (hex-encoded HMAC-SHA512 signing with
+// per-request nonces), request construction, and response parsing for all IBS API endpoints including card creation,
 // balance management, PIN operations, and callback verification.
 //
 // # Getting Started

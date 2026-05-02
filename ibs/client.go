@@ -3,8 +3,10 @@ package ibs
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha512"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -155,22 +157,31 @@ func (c *Client) CardID() string { return c.cardID }
 
 // ---------- internal helpers ----------
 
+func newNonce() (string, error) {
+	nonce := make([]byte, 16)
+	if _, err := rand.Read(nonce); err != nil {
+		return "", fmt.Errorf("ibs: generate nonce: %w", err)
+	}
+	return hex.EncodeToString(nonce), nil
+}
+
 // sign produces the HMAC-SHA512 signature used by the IBS API.
-func (c *Client) sign(body []byte, timestamp string) (string, error) {
+func (c *Client) sign(body []byte, timestamp, nonce string) (string, error) {
 	ds, err := base64.StdEncoding.DecodeString(c.g.secretKey)
 	if err != nil {
 		return "", fmt.Errorf("ibs: failed to decode secret key: %w", err)
 	}
 
-	message := make([]byte, 0, len(body)+len(c.g.apiKey)+len(timestamp))
+	message := make([]byte, 0, len(body)+len(c.g.apiKey)+len(timestamp)+len(nonce))
 	message = append(message, body...)
 	message = append(message, []byte(c.g.apiKey)...)
 	message = append(message, []byte(timestamp)...)
+	message = append(message, []byte(nonce)...)
 
 	h := hmac.New(sha512.New, ds)
 	h.Write(message)
 
-	return base64.StdEncoding.EncodeToString(h.Sum(nil)), nil
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // APIError is returned when the IBS API responds with status=false.
@@ -228,13 +239,18 @@ func (c *Client) requestAPI(method, endpoint string, body map[string]any, auth b
 
 	if auth {
 		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-		signature, err := c.sign(bodyJSON, timestamp)
+		nonce, err := newNonce()
+		if err != nil {
+			return nil, err
+		}
+		signature, err := c.sign(bodyJSON, timestamp, nonce)
 		if err != nil {
 			return nil, err
 		}
 		req.Header.Set("X-Api-Key", c.g.apiKey)
 		req.Header.Set("X-Signature", signature)
 		req.Header.Set("X-Timestamp", timestamp)
+		req.Header.Set("X-Nonce", nonce)
 	}
 
 	resp, err := c.g.httpClient.Do(req)

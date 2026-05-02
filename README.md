@@ -1,6 +1,6 @@
 # IBS SDK for Go
 
-A Go module providing a client SDK for the **IBS** (card provider) service. This package handles authentication (HMAC-SHA512 signing), request construction, response parsing, and callback verification for all IBS API endpoints.
+A Go module providing a client SDK for the **IBS** (card provider) service. This package handles authentication (hex-encoded HMAC-SHA512 signing with per-request nonces), request construction, response parsing, and callback verification for all IBS API endpoints.
 
 ## Installation
 
@@ -81,6 +81,8 @@ ibs.Configure(ibs.Config{
 | `APIURL`    | Base URL of the IBS API                           |
 | `APIKey`    | API key for authentication and HMAC signing       |
 | `SecretKey` | Base64-encoded secret key for HMAC-SHA512 signing |
+
+Authenticated requests include `X-Api-Key`, `X-Timestamp`, `X-Nonce`, and `X-Signature`. The signature is `hex(HMAC-SHA512(body || apiKey || timestamp || nonce, base64_decode(secretKey)))`.
 
 **Never hardcode secrets** — use environment variables or a secret manager.
 
@@ -304,7 +306,7 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 You can also verify signatures manually:
 
 ```go
-err := client.VerifyCallbackSignature(apiKey, signature, timestamp, bodyBytes)
+err := client.VerifyCallbackSignature(apiKey, signature, timestamp, nonce, bodyBytes)
 ```
 
 ## Error Handling
