@@ -47,6 +47,9 @@
 //   - [Client.GetCardInfo] — retrieve card details
 //   - [Client.GetCardLedgers] — retrieve paginated transaction ledgers
 //   - [Client.GetCardPendings] — list pending card activations
+//   - [Client.ListTransactions] — list card transactions (pending included)
+//   - [Client.ConfirmTransaction] — approve a pending topup
+//   - [Client.ReverseTransaction] — reject a pending or failed topup
 //   - [Client.CardBalance] — add or deduct balance (positive = add, negative = deduct)
 //   - [Client.CardEnable] — enable or disable a card
 //   - [Client.CardATM] — enable or disable ATM withdrawals

@@ -25,6 +25,7 @@ ibs-sdk/
     ├── card_prices.go      # Price type, Prices()
     ├── card_ledgers.go     # Ledger, Ledgers types, GetCardLedgers()
     ├── card_pendings.go    # PendingCard, CardPendings, GetCardPendings()
+    ├── card_transactions.go # Transaction, ListTransactions, ConfirmTransaction, ReverseTransaction
     ├── callback.go         # CardActivation types, high-level Callback() dispatcher
     └── callback_verify.go  # Signature verification, callback parsing, sentinel errors
 ```
@@ -245,6 +246,39 @@ for _, p := range pendings.Cards {
 	fmt.Printf("Order %s — Status: %s\n", p.OrderID, p.Status)
 }
 ```
+
+### Transactions
+
+List, confirm, and reverse card topups scoped to the calling service. Pending
+transactions are part of the default list response — no opt-in required.
+
+```go
+// List transactions with optional filters
+list, err := client.ListTransactions(ibs.TransactionListQuery{
+	BankID:   "papara",
+	Status:   ibs.TransactionStatusPending, // omit to receive all statuses
+	FromDate: time.Now().Add(-24 * time.Hour),
+	Limit:    100,
+})
+for _, tx := range list.Transactions {
+	fmt.Printf("%s %s %+.2f %s (%s)\n", tx.ID, tx.Type, tx.Amount, tx.Currency, tx.Status)
+}
+
+// Approve a pending topup (bank must support confirmation)
+result, err := client.ConfirmTransaction("11111111-2222-3333-4444-555555555555")
+fmt.Printf("New balance: %.2f\n", result.Balance)
+
+// Reject a pending or failed topup
+reverse, err := client.ReverseTransaction(
+	"11111111-2222-3333-4444-555555555555",
+	"user cancelled the topup", // optional; empty string is normalised to "reversed by service"
+)
+fmt.Printf("refunded: %v, amount: %s %s\n", reverse.WalletRefunded, reverse.WalletRefundAmount, reverse.WalletCurrency)
+```
+
+Use the `TransactionType*` (`topup`, `withdraw`) and `TransactionStatus*`
+(`pending`, `success`, `failed`, `reversed`) constants for type-safe filter
+values.
 
 ### Pricing
 
