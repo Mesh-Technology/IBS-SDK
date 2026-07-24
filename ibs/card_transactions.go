@@ -197,7 +197,7 @@ func (c *Client) ListTransactions(q TransactionListQuery) (TransactionList, erro
 	query.Set("page", strconv.Itoa(page))
 	query.Set("limit", strconv.Itoa(limit))
 
-	endpoint := "/v1/card/transactions"
+	endpoint := "/card/transactions"
 	if encoded := query.Encode(); encoded != "" {
 		endpoint += "?" + encoded
 	}
@@ -260,7 +260,7 @@ func (c *Client) ConfirmTransaction(transactionID string) (ConfirmTransactionRes
 
 	respBody, err := c.requestAPI(
 		http.MethodPost,
-		"/v1/card/transactions/confirm",
+		"/card/transactions/confirm",
 		map[string]any{
 			"transaction_id": trimmed,
 		},
@@ -322,7 +322,7 @@ func (c *Client) ReverseTransaction(transactionID, reason string) (ReverseTransa
 
 	respBody, err := c.requestAPI(
 		http.MethodPost,
-		"/v1/card/transactions/reverse",
+		"/card/transactions/reverse",
 		map[string]any{
 			"transaction_id": trimmedID,
 			"reason":         trimmedReason,
