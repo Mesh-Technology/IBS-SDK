@@ -20,7 +20,7 @@ ibs-sdk/
     ├── client.go           # Config, Options, Configure(), Client, New(), requestAPI
     ├── card.go             # Card type, GetCardInfo
     ├── card_create.go      # Virtual, Physical, PendingCardOrder, VirtualCard(), PhysicalCard()
-    ├── card_manage.go      # ExistingCard, CardInfoUpdate, AddCard(), UpdateCardInfo()
+    ├── card_manage.go      # ExistingCard, CardInfoUpdate, AddCard(), UpdateCardInfo(), DeleteCard()
     ├── card_settings.go    # CardEnable, CardATM, ChangePIN, SendPIN, UpdateOwnership
     ├── card_balance.go     # CardBalance
     ├── card_prices.go      # Price type, Prices()
@@ -210,6 +210,12 @@ card, err := client.UpdateCardInfo(ibs.CardInfoUpdate{
 	UserFullName: "Jane Doe",
 	UserEmail:    "jane@example.com",
 })
+```
+
+Permanently remove a local card record:
+
+```go
+err := client.DeleteCard()
 ```
 
 ### Card Information

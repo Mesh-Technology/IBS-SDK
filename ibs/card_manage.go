@@ -98,6 +98,19 @@ func (c *Client) UpdateCardInfo(data CardInfoUpdate) (*ManagedCard, error) {
 	return parseManagedCard(respBody)
 }
 
+// DeleteCard permanently removes a card from the local database.
+func (c *Client) DeleteCard() error {
+	_, err := c.requestAPI(
+		http.MethodPost,
+		"/card/delete/hard",
+		map[string]any{
+			"card_id": c.cardID,
+		},
+		true)
+
+	return err
+}
+
 func addNonEmptyString(body map[string]any, key, value string) {
 	if value != "" {
 		body[key] = value

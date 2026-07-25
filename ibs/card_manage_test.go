@@ -80,6 +80,18 @@ func TestUpdateCardInfoOmitsEmptyFields(t *testing.T) {
 	}
 }
 
+func TestDeleteCard(t *testing.T) {
+	wantBody := map[string]any{
+		"card_id": "card-456",
+	}
+	client := newManagedCardTestClient(t, "/card/delete/hard", wantBody)
+	client.cardID = "card-456"
+
+	if err := client.DeleteCard(); err != nil {
+		t.Fatalf("DeleteCard failed: %v", err)
+	}
+}
+
 func newManagedCardTestClient(t *testing.T, wantPath string, wantBody map[string]any) *Client {
 	t.Helper()
 
