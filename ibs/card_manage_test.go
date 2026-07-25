@@ -84,7 +84,7 @@ func TestDeleteCard(t *testing.T) {
 	wantBody := map[string]any{
 		"card_id": "card-456",
 	}
-	client := newManagedCardTestClient(t, "/card/delete/hard", wantBody)
+	client := newManagedCardTestClient(t, "/card/delete", wantBody)
 	client.cardID = "card-456"
 
 	if err := client.DeleteCard(); err != nil {

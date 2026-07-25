@@ -98,11 +98,11 @@ func (c *Client) UpdateCardInfo(data CardInfoUpdate) (*ManagedCard, error) {
 	return parseManagedCard(respBody)
 }
 
-// DeleteCard permanently removes a card from the local database.
+// DeleteCard revokes a card without replacement, setting revoked = true and enabled = false.
 func (c *Client) DeleteCard() error {
 	_, err := c.requestAPI(
 		http.MethodPost,
-		"/card/delete/hard",
+		"/card/delete",
 		map[string]any{
 			"card_id": c.cardID,
 		},

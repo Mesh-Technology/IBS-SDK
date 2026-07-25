@@ -212,7 +212,7 @@ card, err := client.UpdateCardInfo(ibs.CardInfoUpdate{
 })
 ```
 
-Permanently remove a local card record:
+Revoke a card without replacement:
 
 ```go
 err := client.DeleteCard()
