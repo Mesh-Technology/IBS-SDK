@@ -20,6 +20,7 @@ ibs-sdk/
     ├── client.go           # Config, Options, Configure(), Client, New(), requestAPI
     ├── card.go             # Card type, GetCardInfo
     ├── card_create.go      # Virtual, Physical, PendingCardOrder, VirtualCard(), PhysicalCard()
+    ├── card_manage.go      # ExistingCard, CardInfoUpdate, AddCard(), UpdateCardInfo()
     ├── card_settings.go    # CardEnable, CardATM, ChangePIN, SendPIN, UpdateOwnership
     ├── card_balance.go     # CardBalance
     ├── card_prices.go      # Price type, Prices()
@@ -182,6 +183,34 @@ card, pending, err := client.PhysicalCard(ibs.Physical{
 ```
 
 Both methods return a `*Card` on immediate activation, or a `*PendingCardOrder` when the activation is queued for asynchronous processing.
+
+### Local Card Management
+
+Register an existing card locally without calling an upstream provider:
+
+```go
+card, err := client.AddCard(ibs.ExistingCard{
+	BankID:         "papara",
+	UserFullName:   "John Doe",
+	UserEmail:      "user@example.com",
+	ProviderCardID: "provider-card-123",
+	CardNumber:     "4111111111111111",
+	Cvv:            "123",
+	ExpireMonth:    "12",
+	ExpireYear:     "2029",
+	Type:           "physical",
+})
+```
+
+Update local information for the card in the client's card context. Empty fields are left unchanged:
+
+```go
+card, err := client.UpdateCardInfo(ibs.CardInfoUpdate{
+	UserID:       "new-user-456",
+	UserFullName: "Jane Doe",
+	UserEmail:    "jane@example.com",
+})
+```
 
 ### Card Information
 
