@@ -56,6 +56,7 @@
 //   - [Client.ChangePIN] — change the card PIN
 //   - [Client.SendPIN] — send the card PIN to the cardholder
 //   - [Client.UpdateOwnership] — transfer card ownership to another user
+//   - [Client.UpdateUserOwnership] — transfer all cards owned by a user
 //   - [Client.Prices] — retrieve pricing information
 //   - [Client.Callback] — high-level dispatcher for card activation
 //

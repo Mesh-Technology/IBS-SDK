@@ -21,7 +21,7 @@ ibs-sdk/
     ├── card.go             # Card type, GetCardInfo
     ├── card_create.go      # Virtual, Physical, PendingCardOrder, VirtualCard(), PhysicalCard()
     ├── card_manage.go      # ExistingCard, CardInfoUpdate, AddCard(), UpdateCardInfo(), DeleteCard()
-    ├── card_settings.go    # CardEnable, CardATM, ChangePIN, SendPIN, UpdateOwnership
+    ├── card_settings.go    # CardEnable, CardATM, ChangePIN, SendPIN, ownership updates
     ├── card_balance.go     # CardBalance
     ├── card_prices.go      # Price type, Prices()
     ├── card_ledgers.go     # Ledger, Ledgers types, GetCardLedgers()
@@ -260,7 +260,12 @@ err := client.SendPIN()
 ### Ownership Transfer
 
 ```go
+// Transfer the card in the client's card context
 err := client.UpdateOwnership("new-user-456")
+
+// Transfer all non-revoked cards in the client's user context
+updated, err := client.UpdateUserOwnership("new-user-456")
+fmt.Printf("Transferred %d cards\n", updated)
 ```
 
 ### Transaction Ledgers
