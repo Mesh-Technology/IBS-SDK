@@ -18,6 +18,7 @@ type Ledger struct {
 	ResultingBalance    float64
 	TransactionAmount   float64
 	TransactionCurrency string
+	Status              string
 }
 
 // Ledgers represents a paginated list of ledger entries.
@@ -42,6 +43,7 @@ type getLedgersResponse struct {
 			ResultingBalance    float64 `json:"resulting_balance"`
 			TransactionAmount   float64 `json:"transaction_amount"`
 			TransactionCurrency string  `json:"transaction_currency"`
+			Status              string  `json:"status"`
 		} `json:"ledgers"`
 	} `json:"data"`
 	Error string `json:"error,omitempty"`
@@ -76,6 +78,7 @@ func (c *Client) GetCardLedgers(pageNumber string) (Ledgers, error) {
 			ResultingBalance:    ledger.ResultingBalance,
 			TransactionAmount:   ledger.TransactionAmount,
 			TransactionCurrency: ledger.TransactionCurrency,
+			Status:              ledger.Status,
 		})
 	}
 
